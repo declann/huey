@@ -1,0 +1,15 @@
+{
+  "name": "huey",
+  "version": "1.0.0",
+  "description": "Huey is a browser-based application that lets you explore tabular datasets. Huey supports reading from multiple file formats, like .csv, .parquet, .json data files as well as .duckdb database files.",
+  "main": "index.js",
+  "scripts": {
+    "huey": "http-server src -a 127.0.0.1 --cors -c-1 -p 8999",
+    "data": "http-server DATA -a 127.0.0.1 --cors -c-1 -p 8998",
+    "dev": "npm run huey & npm run data"
+  },
+  "keywords": [],
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

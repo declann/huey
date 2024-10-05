@@ -52,7 +52,7 @@ menu[role=toolbar] > label[for=uploader]::before {
 }
 
 #uploader {
-  display: none;
+  /*display: none;*/
 }
 
 menu[role=toolbar] > label[for=loadFromUrl]::before {

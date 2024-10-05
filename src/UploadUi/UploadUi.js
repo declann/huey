@@ -45,6 +45,13 @@ class UploadUi {
     var destroyDatasource = false;
     try {
       if (typeof file === 'string'){
+
+        // Can I trigger #uploadFile on a postmessage?
+
+        // Here workflow is:
+        // URL -> calculang -> DuckDB -> pivottable -> export
+        // 
+
         duckDbDataSource = await DuckDbDataSource.createFromUrl(duckdb, instance, file);
         progressBar.value = parseInt(progressBar.value, 10) + 20;
 
@@ -53,6 +60,13 @@ class UploadUi {
       }
       else
       if (file instanceof File){ 
+
+        // in here run model in worker, get Arrow output into DuckDB.
+        // but what UI components do I need to make?
+
+        // this workflow is... DND -> calculang -> pivottable -> export
+        // links will work
+
         duckDbDataSource = DuckDbDataSource.createFromFile(duckdb, instance, file);
         progressBar.value = parseInt(progressBar.value, 10) + 20;
         
