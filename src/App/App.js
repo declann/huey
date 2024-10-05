@@ -1,3 +1,18 @@
+window.addEventListener('message', function(event){
+  var eventData = event.data;
+  switch (eventData.requestId){
+    default:
+      debugger;
+      //uploadUi.url(eventData.url)
+      uploadUi.uploadFiles([eventData.url])
+      /*showErrorDialog({
+        title: 'Error handling posted message',
+        description: `The request ${eventData.requestId} was not recognizeded as a valid requestId.` 
+      });*/
+  }
+});
+
+
 function duckDbRowToJSON(object){
   var pojo;
   if (typeof object.toJSON === 'function'){
