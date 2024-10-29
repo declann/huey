@@ -8,6 +8,32 @@
     </style>
   </head>
   <body>
+    <script type="module">
+
+      // https://github.com/uwdata/flechette?tab=readme-ov-file#build-and-encode-arrow-data
+      
+      import {
+        bool, dictionary, float32, int32, tableFromArrays, tableToIPC, utf8
+      } from 'https://cdn.jsdelivr.net/npm/@uwdata/flechette/dist/flechette.mjs';
+
+      // data defined using standard JS types
+      // both arrays and typed arrays work well
+      const arrays = {
+        ints: [1, 2, null, 4, 5],
+        floats: [1.1, 2.2, 3.3, 4.4, 5.5],
+        bools: [true, true, null, false, true],
+        strings: ['a', 'b', 'c', 'b', 'a']
+      };
+
+      // create table with automatically inferred types
+      const tableInfer = tableFromArrays(arrays);
+
+      // encode table to bytes in Arrow IPC stream format
+      const ipcInfer = tableToIPC(tableInfer);
+
+      console.log(ipcInfer)
+
+    </script>
     
     <!-- 
       Local UI for controlling the embedded Huey application
