@@ -10,6 +10,11 @@ class PostMessageProtocol {
   // optionally a boolean selectForAnalysis property maybe present that indicates whether the datasource will be selected
   // (selecting the datasource means that the attribute ui will be activated showing the properties of this datasource)
   static REQUEST_CREATE_DATASOURCE = 'createDatasource';
+
+  // Arrow to programatically add data
+  static REQUEST_CREATE_TABLE_ARROW = 'createTableArrow';
+  static REQUEST_APPEND_TABLE_ARROW = 'createAppendArrow';
+
   // set the route.
   // this is a high level method to set the state of the page.
   // (the details of how the state of the page is set is left to the router.)

@@ -33,7 +33,7 @@
 
       console.log(ipcInfer)
 
-      document.getElementById('arrowPreview').value = `Uint8Array(${ipcInfer.length}) [${ipcInfer.join(', ')}]`
+      document.getElementById('arrowPreview').value = /*`Uint8Array(${ipcInfer.length}) */`[${ipcInfer.join(', ')}]`
 
     </script>
     
@@ -45,6 +45,7 @@
         <h3>Arrow</h3>
         <label for="arrowPreview">Arrow data (Arrow IPC format: Uint8Array ready for postMessage):</label>
         <textarea id="arrowPreview" style="width: 99%" rows="10"></textarea>
+        <a href="#" id="sendArrow">Send Arrow</a>
         <h3>Request</h3>
         <label for="file">Choose a File to create a Huey Data Source:</label>
         <input type="file" id="file"/>
@@ -74,6 +75,22 @@
       }
       
       var messageExchangeId = 0;
+
+      document.getElementById('sendArrow').addEventListener('click', e => {
+        console.log(JSON.parse(document.getElementById('arrowPreview').value))
+        messageExchangeId++;
+        var message = {
+          requestId: messageExchangeId,
+          messageType: PostMessageProtocol.REQUEST_CREATE_TABLE_ARROW,
+          body: {
+            selectForAnalysis: true,
+            datasourceConfig: {
+              type: 'arrow',
+              data: JSON.parse(document.getElementById('arrowPreview').value)
+            }
+          }
+        };
+      });
       
       document.getElementById('file').addEventListener('change', function(event){
         var frame = getHueyFrame();
