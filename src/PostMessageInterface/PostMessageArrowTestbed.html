@@ -77,7 +77,11 @@
       var messageExchangeId = 0;
 
       document.getElementById('sendArrow').addEventListener('click', e => {
-        console.log(JSON.parse(document.getElementById('arrowPreview').value))
+        var frame = getHueyFrame();
+        const data = JSON.parse(document.getElementById('arrowPreview').value);
+
+        console.log('sending arrow data', data);
+        
         messageExchangeId++;
         var message = {
           requestId: messageExchangeId,
@@ -86,10 +90,13 @@
             selectForAnalysis: true,
             datasourceConfig: {
               type: 'arrow',
-              data: JSON.parse(document.getElementById('arrowPreview').value)
+              data: data
             }
           }
         };
+        frame.contentWindow.postMessage(message, {
+            "targetOrigin": '*'
+        });
       });
       
       document.getElementById('file').addEventListener('change', function(event){
