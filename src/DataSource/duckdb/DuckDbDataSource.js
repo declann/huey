@@ -153,6 +153,8 @@ class DuckDbDataSource extends EventEmitter {
   #rejects_balance = 0n;
   #reject_count = 0n;  
   
+  #originalConfig = undefined;
+  
   #defaultSampleSize = 100;
   
   #duckDb = undefined;
@@ -178,10 +180,15 @@ class DuckDbDataSource extends EventEmitter {
   
   constructor(duckDb, duckDbInstance, config){
     super(['destroy', 'rejectsdetected', 'change']);
+    this.#originalConfig = Object.assign({}, config);
     this.#datasource_uid = ++DuckDbDataSource.#datasource_uid_generator;
     this.#duckDb = duckDb;
     this.#duckDbInstance = duckDbInstance;
     this.#init(config);
+  }
+  
+  getOriginalConfig(){
+    return this.#originalConfig;
   }
   
   getSettings(){
@@ -212,27 +219,50 @@ class DuckDbDataSource extends EventEmitter {
     };
   }
   
-  static async getContentTypeForUrl(url){
+  static async getResourceInfoForUrl(url, httpMethod, requestHeaders){
     return new Promise(function(resolve, reject){
       try {
         var xhr = new XMLHttpRequest();
         xhr.addEventListener("error", function(error){
-          resolve(undefined);
+          reject(error);
         });
         
         xhr.addEventListener("load", function(){
-          var contentType = xhr.getResponseHeader('Content-Type');
-          resolve(contentType);
+          var allResponseHeaders = xhr.getAllResponseHeaders();
+          var headersArray = allResponseHeaders.split('\r\n');
+          var headers = headersArray.reduce(function(headers, header){
+            var nameValue = header.split(':');
+            var name = nameValue.shift().trim();
+            if (name.length) {
+              name = name.toLowerCase();
+              var value = nameValue.join(':').trim();
+              headers[name] = value;
+            }
+            return headers;
+          }, {});
+          resolve({
+            headers: headers,
+            status: xhr.status,
+            statusText: xhr.statusText,
+            responseType: xhr.responseType,
+            responseText: xhr.responseText
+          });
         });
-        xhr.open('HEAD', url);
+        
+        xhr.open(httpMethod || 'GET', url);
+        if (requestHeaders){
+          for (var requestHeader in requestHeaders){
+            xhr.setRequestHeader(requestHeader, requestHeaders[requestHeader]);
+          }
+        }
         xhr.send();
       } 
       catch(e){
-        resolve(undefined);
+        reject(e);
       }
     });
-  }  
-  
+  }
+    
   // this is a light weight method that should produce the id of a datasource that would be created for the given file.
   // this should not actually instantiate a datasource, merely its identifier. 
   // It is a service to easily create UI elements that may refer to a datasource without having to actually create one.
@@ -256,8 +286,8 @@ class DuckDbDataSource extends EventEmitter {
       url: url
     };
     
-    var contentType;
-    contentType = await DuckDbDataSource.getContentTypeForUrl(url);
+    var response = await DuckDbDataSource.getResourceInfoForUrl(url, 'HEAD');
+    var contentType = response.headers['content-type'];
     if (contentType){
       config.contentType = contentType;
       var contentTypes = contentType.split(';');
@@ -270,6 +300,32 @@ class DuckDbDataSource extends EventEmitter {
             config.fileType = fileType;
             break _outer;
           }
+        }
+      }
+      // if we couldn't identify a file type then we can try to examine the file to read a magic number.
+      if (!config.fileType){
+        switch (response.headers['accept-ranges']) {
+          case 'bytes':
+            var response = await DuckDbDataSource.getResourceInfoForUrl(url, 'GET', {
+              "Accept": contentType,
+              "Range": 'bytes=0-16'
+            });
+            var responseText = response.responseText;
+            if (responseText.startsWith('SQLite format 3\0')) {
+              config.type = DuckDbDataSource.types.SQLITE;
+            }
+            else 
+            if (responseText.substring(7, 7 + 'DUCK'.length) === 'DUCK') {
+              config.type = DuckDbDataSource.types.DUCKDB;
+            }
+            if (config.type) {
+              delete config.url;
+            }
+            break;
+          case 'none':
+          case undefined:
+          default:
+            // alas
         }
       }
     }
@@ -300,7 +356,7 @@ class DuckDbDataSource extends EventEmitter {
     return dsInstance;
   }
   
-  static createFromSql(duckdb,instance, sql){
+  static createFromSql(duckdb, instance, sql){
     var config = {
       type: DuckDbDataSource.types.SQLQUERY,
       sql: sql
@@ -406,7 +462,7 @@ class DuckDbDataSource extends EventEmitter {
         this.#sqlQuery = config.sql;
         break;
       default:
-        throw new Error(`Could not initialize the datasource: unrecognized type ${type}`);
+        throw new Error(`Could not initialize the datasource: unrecognized type "${type}"`);
     }
     this.#type = type;
   }
@@ -653,6 +709,7 @@ class DuckDbDataSource extends EventEmitter {
             sql += ` (TYPE SQLITE)`;
           }
       }
+      await this.registerFile();
       var resultSet = await connection.query(sql);
       result = true;
     }
@@ -956,6 +1013,12 @@ class DuckDbDataSource extends EventEmitter {
     return this.#managedConnection;
   }
   
+  async query(sql){
+    var connection = await this.getConnection();
+    var result = await connection.query(sql);
+    return result;
+  }
+  
   async prepareStatement(sql){
     var connection = await this.getConnection();
     var preparedStatement = await connection.prepare(sql);
@@ -1013,6 +1076,7 @@ class DuckDbDataSource extends EventEmitter {
     
     var sql = this.getSqlForTableSchema();
     var connection = await this.getConnection();
+    await this.registerFile();
     var columnMetadata = connection.query(sql);
     this.#columnMetadata = columnMetadata;
     return columnMetadata;

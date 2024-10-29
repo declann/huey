@@ -70,6 +70,14 @@
   content: "\f61a";
 }
 
+.attributeUi details[data-nodetype=derived][data-derivation='elements'][data-member_expression_type^=MAP] > summary > .icon::before,
+.attributeUi details[data-nodetype=member][data-member_expression_type^=MAP] > summary > .icon::before,
+.attributeUi details[data-nodetype=column][data-column_type^=MAP] > summary > .icon::before
+{
+  /* list-letters */
+  content: "\fc47";
+}
+
 .attributeUi details[data-nodetype=derived][data-derivation='elements'][data-member_expression_type$='[]'] > summary > .icon::before,
 .attributeUi details[data-nodetype=member][data-member_expression_type$='[]'] > summary > .icon::before,
 .attributeUi details[data-nodetype=column][data-column_type$='[]'] > summary > .icon::before
@@ -336,7 +344,7 @@ main.layout:has( .workarea > .pivotTableUiContainer[aria-busy=true] ) > nav#side
   display: block;
   float: inline-end;
   width: 24px;
-  padding: 6px 3px 0px 3px;
+  padding: 4px 3px 0px 3px;
   font-family: var( --huey-icon-font-family ) !important;
   font-size: var( --huey-icon-medium );
   color: var( --huey-icon-color-subtle );

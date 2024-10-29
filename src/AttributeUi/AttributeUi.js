@@ -330,13 +330,13 @@ class AttributeUi {
     "element indices": {
       folder: 'array operations',
       columnType: 'BIGINT',
-      expressionTemplate: "generate_subscripts( ${columnExpression}, 1 )",
+      expressionTemplate: "generate_subscripts( case len( coalesce( ${columnExpression}, []) ) when 0 then [ NULL ] else ${columnExpression} end, 1 )",
       unnestingFunction: 'generate_subscripts'
     },
     "elements": {
       folder: 'array operations',
       hasElementDataType: true,
-      expressionTemplate: "unnest( ${columnExpression} )",
+      expressionTemplate: "unnest( case len( coalesce( ${columnExpression}, []) ) when 0 then [ NULL ] else ${columnExpression} end )",
       unnestingFunction: 'unnest'
     }    
   }
@@ -490,19 +490,15 @@ class AttributeUi {
     var memberExpressionPath = node.getAttribute('data-member_expression_path');
     if (memberExpressionPath) {
       memberExpressionPath = JSON.parse(memberExpressionPath);
-      columnType = node.getAttribute('data-member_expression_type');
     }
     
     var derivation = node.getAttribute('data-derivation');
-    if (derivation ===  'elements') {
-      columnType = node.getAttribute('data-element_type');
-    }
     var aggregator = aggregator || node.getAttribute('data-aggregator');
 
     var itemConfig = {
       axis: axis,
       columnName: columnName,
-      columnType: columnType,
+      columnType: columnType,     // the type of this item's values
       derivation: derivation,
       aggregator: aggregator,
       memberExpressionPath: memberExpressionPath
@@ -838,7 +834,7 @@ class AttributeUi {
   }
     
   #loadMemberChildNodes(node, typeName, profile){
-    var folderNode = this.#renderFolderNode({caption: 'struct'});
+    var folderNode = this.#renderFolderNode({caption: 'structure'});
     var columnType = profile.memberExpressionType || profile.column_type;
     var memberExpressionPath = profile.memberExpressionPath || [];
     var structure = getStructTypeDescriptor(columnType);
@@ -900,7 +896,7 @@ class AttributeUi {
           memberExpressionType = profile.memberExpressionType || profile.column_type;
           memberExpressionType = memberExpressionType.slice(0, -2);
         }
-        nodeProfile.column_type =  memberExpressionType;  
+        nodeProfile.column_type = profile.column_type;  
         nodeProfile.memberExpressionType = memberExpressionType;
       }
       else {
@@ -991,6 +987,7 @@ class AttributeUi {
     if (event.newState === 'open'){ 
       if (node.childNodes.length === 1){
         this.#loadChildNodes(node);
+        this.#updateState();
       }
     }
   }
@@ -1003,7 +1000,7 @@ class AttributeUi {
 
       var node = getAncestorWithTagName(input, 'details')
       var columnName = node.getAttribute('data-column_name');
-      var aggregator = node.getAttribute('data-aggregator');
+      var aggregator = input.getAttribute('data-aggregator');
       var derivation = node.getAttribute('data-derivation');
       var memberExpressionPath = node.getAttribute('data-member_expression_path');
       

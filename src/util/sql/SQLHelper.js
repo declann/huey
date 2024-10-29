@@ -31,7 +31,7 @@ function createNumberFormatter(fractionDigits){
   intFormatter = new Intl.NumberFormat(locales, Object.assign({maximumFractionDigits: 0}, options));
   if (fractionDigits){
     options.minimumFractionDigits = localeSettings.minimumFractionDigits;
-    options.maximumFractionDigits = localeSettings.maximumFractionDigits;
+    options.maximumFractionDigits = localeSettings.linkMinimumAndMaximumDecimals ? localeSettings.minimumFractionDigits : localeSettings.maximumFractionDigits;
     if (options.maximumFractionDigits < options.minimumFractionDigits) {
       options.maximumFractionDigits = options.minimumFractionDigits;
     }
@@ -99,13 +99,28 @@ function createNumberFormatter(fractionDigits){
                 }
               }
             }
-            stringValue = intFormatter.format(BigInt(integerPart));
-            if (fractionalPart && options.minimumFractionDigits > 0) {
+
+            var integerPart = BigInt(integerPart);
+
+            if (fractionalPart) {
+              if (fractionalPart.length > options.maximumFractionDigits) {
+                fractionalPart = parseFloat('0.' + fractionalPart).toFixed(options.maximumFractionDigits);
+                if (parseFloat(fractionalPart) >= 1) {
+                  integerPart += (integerPart >= 0n ? 1n : -1n);
+                }
+                fractionalPart = String(fractionalPart).split('.')[1];
+              }
+              
               if (decimalSeparator === undefined) {
                 decimalSeparator = '.';
               }
-              stringValue += decimalSeparator + fractionalPart;
             }
+            
+            stringValue = intFormatter.format(integerPart);
+            if (fractionalPart) {
+              stringValue = `${stringValue}${decimalSeparator}${fractionalPart}`;
+            }
+            
             return stringValue;
         }
       }
@@ -723,7 +738,7 @@ function getDataTypeInfo(columnType){
 }
 
 function quoteStringLiteral(str){
-  return `'${str.replace(/'/g, "''")}'`; 
+  return typeof str === 'string'  ? `'${str.replace(/'/g, "''")}'` : str; 
 }
 
 function identifierRequiresQuoting(identifier){
@@ -798,6 +813,9 @@ function getQualifiedIdentifier(){
           break;
         case 'string':
           return getQualifiedIdentifier([arguments[0], arguments[1]]);
+          break;
+        case 'undefined':
+          return getQualifiedIdentifier(arguments[0], normalizeSqlOptions());
           break;
         default:
           throw new Error(`Invalid argument type ${typeof arguments[1]}`);
@@ -1014,7 +1032,7 @@ function getDuckDbPivotSqlStatementForQueryModel(queryModel, sqlOptions){
   var aggregateExpressions = {};
   
   if (cellsAxisItems.length === 0){
-    aggregateExpressions[' '] = `${keywordFormatter('any_value')}( keywordFormatter('null') )`;
+    aggregateExpressions[' '] = `${keywordFormatter('any_value')}( ${keywordFormatter('null')} )`;
   }
   else {
     cellsAxisItems.forEach(function(cellsAxisItem){
@@ -1168,6 +1186,24 @@ function getStructTypeDescriptor(structColumnType){
     }
   }
   return structure;
+}
+
+function getMemberExpressionType(type, memberExpressionPath){
+  if (memberExpressionPath.length) {
+    var typeDescriptor = getStructTypeDescriptor(type);
+    var memberExpression = memberExpressionPath[0];
+    var memberExpressionType;
+    if (memberExpression === 'unnest()'){
+      memberExpressionType = type.slice(0, -2);
+    }
+    else {
+      memberExpressionType = typeDescriptor[memberExpression];
+    }
+    return getMemberExpressionType(memberExpressionType, memberExpressionPath.slice(1));
+  }
+  else {
+    return type;
+  }
 }
 
 function extrapolateColumnExpression(expressionTemplate, columnExpression){

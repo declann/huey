@@ -121,6 +121,7 @@ function initApplication(){
   initPageStateManager();
   initUploadUi();
   initDatasourceSettingsDialog();
+  initSessionCloner();
  
   var currentRoute = Routing.getCurrentRoute();
   if (currentRoute){
@@ -171,5 +172,9 @@ function initApplication(){
       busyDialog.close();
     }
   });
-   
+  
+  initPostMessageInterface();
+  if (postMessageInterface) {
+    postMessageInterface.sendReadyMessage();
+  }
 }

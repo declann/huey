@@ -83,6 +83,8 @@ class QueryAxisItem {
       return caption;
     }
 
+    caption = QueryAxisItem.createCaptionForQueryAxisItem(axisItem);
+
     if (axisItem.axis === QueryModel.AXIS_FILTERS) {
       if (axisItem.filter === undefined || axisItem.filter.values === undefined) {
         return 'No filter set'
@@ -104,11 +106,9 @@ class QueryAxisItem {
         }
         valueLabels.push(valueLabel);
       }
-      caption = valueLabels.join("\n");
-      return caption;
+      caption = `${filter.filterType} ${valueLabels.join('\n')}`;
     }
 
-    caption = QueryAxisItem.createCaptionForQueryAxisItem(axisItem);
     return caption;
   }
   
@@ -143,18 +143,25 @@ class QueryAxisItem {
     return id;
   }
 
-  static #getSqlForColumnExpression(item, alias, sqlOptions) {
+  static getSqlForColumnExpression(item, alias, sqlOptions) {
     var sqlExpression = [item.columnName];
-
-    if (item.memberExpressionPath) {
-      sqlExpression = sqlExpression.concat(item.memberExpressionPath);
-    }
 
     if (alias){
       sqlExpression.unshift(alias);
     }
     
     sqlExpression = getQualifiedIdentifier(sqlExpression, sqlOptions);
+
+    if (item.memberExpressionPath) {
+      var memberExpressionPath = item.memberExpressionPath;
+      var memberExpression = memberExpressionPath
+      .map(function(memberExpressionPathElement){
+        // todo: escape single quote in memberExpressionPathElement
+        return `['${memberExpressionPathElement}']`;
+      })
+      .join('');
+      sqlExpression += memberExpression;
+    }
     return sqlExpression;
   }
 
@@ -167,7 +174,7 @@ class QueryAxisItem {
       }
     }
     else {
-      columnExpression = QueryAxisItem.#getSqlForColumnExpression(item, alias, sqlOptions);
+      columnExpression = QueryAxisItem.getSqlForColumnExpression(item, alias, sqlOptions);
     }
 
     var aggregator = item.aggregator;
@@ -178,7 +185,7 @@ class QueryAxisItem {
   }
 
   static getSqlForDerivedQueryAxisItem(item, alias, sqlOptions){
-    var columnExpression = QueryAxisItem.#getSqlForColumnExpression(item, alias, sqlOptions);
+    var columnExpression = QueryAxisItem.getSqlForColumnExpression(item, alias, sqlOptions);
 
     var derivation = item.derivation;
     var derivationInfo;
@@ -200,14 +207,18 @@ class QueryAxisItem {
       sqlExpression = QueryAxisItem.getSqlForDerivedQueryAxisItem(item, alias, sqlOptions);
     }
     else {
-      sqlExpression = QueryAxisItem.#getSqlForColumnExpression(item, alias, sqlOptions);
+      sqlExpression = QueryAxisItem.getSqlForColumnExpression(item, alias, sqlOptions);
     }
     return sqlExpression;
   }
 
   static getQueryAxisItemDataType(queryAxisItem){
-    var columnType = queryAxisItem.columnType;    
+    var columnType = queryAxisItem.columnType;
     var dataType = columnType;
+    if (queryAxisItem.memberExpressionPath) {
+      var memberExpressionPath = queryAxisItem.memberExpressionPath;
+      dataType = getMemberExpressionType(columnType, memberExpressionPath);
+    }
 
     var derivationInfo, derivation = queryAxisItem.derivation;
     if (derivation) {
@@ -218,9 +229,6 @@ class QueryAxisItem {
       else
       if (derivationInfo.preservesColumnType){
         dataType = columnType;
-      }
-      else {
-        dataType = undefined;
       }
     }
 
@@ -298,6 +306,7 @@ class QueryAxisItem {
       operator = 'IS';
       switch (filter.filterType) {
         case FilterDialog.filterTypes.EXCLUDE:
+        case FilterDialog.filterTypes.NOTLIKE:
         case FilterDialog.filterTypes.NOTBETWEEN:
           operator += ' NOT';
       }
@@ -314,6 +323,8 @@ class QueryAxisItem {
     var sql = '', logicalOperator;
     if (literalLists.valueLiterals.length > 0) {
       switch (filter.filterType) {
+
+        // INCLUDE and EXCLUDE logic        
         case FilterDialog.filterTypes.EXCLUDE:
           // in case of exclude, keep NULL values unless NULL is also in the valuelist.
           // https://github.com/rpbouman/huey/issues/90
@@ -333,6 +344,28 @@ class QueryAxisItem {
           }
           sql = `( ${sql} )`;
           break;
+
+        // LIKE and NOT LIKE logic        
+        case FilterDialog.filterTypes.NOTLIKE:
+          operator = 'NOT ';
+        case FilterDialog.filterTypes.LIKE:
+          var dataType = QueryAxisItem.getQueryAxisItemDataType(queryAxisItem);
+          if (dataType !== 'VARCHAR'){
+            columnExpression = `${columnExpression}::VARCHAR`;
+          }
+          operator += 'LIKE';
+          sql = literalLists.valueLiterals.reduce(function(acc, curr, currIndex){
+            acc += '\n';
+            if (currIndex) {
+              acc += (logicalOperator ? logicalOperator : 'OR') + ' ';
+            }
+            var value = literalLists.valueLiterals[currIndex];
+            acc += `${columnExpression} ${operator} ${value}`;
+            return acc;
+          }, '');
+          break;          
+
+        // BETWEEN and NOT BETWEEN logic        
         case FilterDialog.filterTypes.NOTBETWEEN:
           operator = 'NOT ';
           logicalOperator = 'AND';
@@ -982,7 +1015,7 @@ class QueryModel extends EventEmitter {
       hasItems = true;
       queryModelObject.axes[axisId] = items.map(function(axisItem){
         var strippedItem = {column: axisItem.columnName};
-        
+        strippedItem.memberExpressionPath = axisItem.memberExpressionPath;  
         strippedItem.columnType = axisItem.columnType;
         strippedItem.derivation = axisItem.derivation;
         strippedItem.aggregator = axisItem.aggregator;
@@ -1055,6 +1088,7 @@ class QueryModel extends EventEmitter {
           config.columnType = item.columnType;
           config.derivation = item.derivation;
           config.aggregator = item.aggregator;
+          config.memberExpressionPath = item.memberExpressionPath;
           config.caption = item.caption;
           if (item.includeTotals === true){
             config.includeTotals = true;

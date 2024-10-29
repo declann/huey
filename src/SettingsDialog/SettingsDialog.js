@@ -37,7 +37,8 @@ class Settings extends EventEmitter {
       locale: navigator.languages,
       minimumIntegerDigits: 1,
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 2,
+      linkMinimumAndMaximumDecimals: true
     },
     sqlSettings: {
       keywordLetterCase: 'upperCase',
@@ -45,7 +46,9 @@ class Settings extends EventEmitter {
       commaStyle: 'newlineBefore'
     },
     querySettings: {
-      autoRunQuery: false
+      autoRunQuery: false,
+      filterValuePicklistPageSize: 100,
+      filterSearchAutoQueryTimeoutInMilliseconds: 1000
     },
     pivotSettings: {
       maxCellWidth: 30
