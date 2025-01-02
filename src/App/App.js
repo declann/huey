@@ -46,20 +46,14 @@ function initDuckdbVersion(){
     return `${key} AS ${getQuotedIdentifier(columns[key])}`;
   }).join('\n,');
   var sql = `SELECT ${selectListSql}`
-  connection.query(sql)
+  var result = connection.query(sql)
   .then(function(resultset){
     var duckdbVersionLabel = byId('duckdbVersionLabel');
     var row = resultset.get(0);
     var version = row[versionColumn];
     var api = row[apiColumn];
     duckdbVersionLabel.innerText = `DuckDB ${version}, API: ${api}`;
-
-    var spinner = byId('spinner');
-    if (spinner){
-      spinner.style.display = 'none';
-    }
-    var layout = byId('layout');
-    layout.style.display = '';
+    document.body.setAttribute('aria-busy', false);
   })
   .catch(function(){
     console.error(`Error fetching duckdb version info.`);
@@ -70,6 +64,7 @@ async function analyzeDatasource(datasource){
   try {
     TabUi.setSelectedTab('#sidebar', '#attributesTab');
     clearSearch();
+    uploadUi.getDialog().close();
     queryModel.setDatasource(datasource);
   }
   catch (error) {
@@ -86,11 +81,11 @@ async function analyzeDatasource(datasource){
 }
 
 function initExecuteQuery(){
-  
+
   byId('runQueryButton').addEventListener('click', function(event){
     pivotTableUi.updatePivotTableUi();
   });
-  
+
   var autoRunQuery = byId('autoRunQuery');
   var settingsPath = ['querySettings', 'autoRunQuery'];
   autoRunQuery.checked = Boolean( settings.getSettings(settingsPath) );
@@ -122,21 +117,22 @@ function initApplication(){
   initUploadUi();
   initDatasourceSettingsDialog();
   initSessionCloner();
- 
+  initQuickQueryMenu();
+
   var currentRoute = Routing.getCurrentRoute();
   if (currentRoute){
     pageStateManager.setPageState(currentRoute);
   }
- 
+
   bufferEvents(queryModel, 'change', function(event, count){
     if (count !== undefined) {
-      return;      
+      return;
     }
-    
+
     console.log(`buffered Events, event:`);
     var eventData = event.eventData;
     console.log(eventData);
-    
+
     var currentDatasourceCaption, datasource = queryModel.getDatasource();
     if (datasource) {
       currentDatasourceCaption = DataSourcesUi.getCaptionForDatasource(datasource);
@@ -145,18 +141,38 @@ function initApplication(){
       currentDatasourceCaption = '';
     }
     byId('currentDatasource').innerHTML = currentDatasourceCaption;
-    
+
     var title = ExportUi.generateExportTitle(queryModel);
     document.title = 'Huey - ' + title;
-    
+
     Routing.updateRouteFromQueryModel(queryModel);
-  }, null, 1000);
-  
+  }, null, 50);
+
+  var tupleNumberFormatter = createNumberFormatter(0).format;
   pivotTableUi.addEventListener('updated', async function(e){
     var eventData = e.eventData;
-    if (eventData.status === 'error'){
-      showErrorDialog(eventData.error);      
+    var status = eventData.status;
+    
+    var numRowsTuples = '';
+    var numColumnsTuples = '';
+    
+    switch (status) {
+      case 'error':
+        showErrorDialog(eventData.error);
+        break;
+      case 'success':
+        var tupleCounts = eventData.tupleCounts;
+        
+        var numRowsTuples = tupleCounts[QueryModel.AXIS_ROWS];
+        numRowsTuples = typeof numRowsTuples === 'number' ? tupleNumberFormatter(numRowsTuples) : '';
+        
+        var numColumnsTuples = tupleCounts[QueryModel.AXIS_COLUMNS];
+        numColumnsTuples = typeof numColumnsTuples === 'number' ? tupleNumberFormatter(numColumnsTuples) : '';
+        
+        break;
     }
+    byId('queryResultRowsInfo').innerText = numRowsTuples;
+    byId('queryResultColumnsInfo').innerText = numColumnsTuples;
   });
 
   bufferEvents(pivotTableUi, 'busy', function(event, count){
@@ -172,7 +188,7 @@ function initApplication(){
       busyDialog.close();
     }
   });
-  
+
   initPostMessageInterface();
   if (postMessageInterface) {
     postMessageInterface.sendReadyMessage();
