@@ -79,6 +79,9 @@ class DuckDbDataSource extends EventEmitter {
     },
     sniff_csv: {
       "sample_size": 20480
+    },
+    read_json_auto: {
+      "ignore_errors": true
     }
   };
 
@@ -482,6 +485,9 @@ class DuckDbDataSource extends EventEmitter {
       case DuckDbDataSource.types.FILES:
         postFix = JSON.stringify(this.#fileNames);
         break;
+      case DuckDbDataSource.types.SQLQUERY:
+        postFix = this.#sqlQuery;
+        break;
       default:
         postFix = this.getQualifiedObjectName();
     }
@@ -492,12 +498,12 @@ class DuckDbDataSource extends EventEmitter {
     var parts = datasourceId.split(':');
     var type = parts.shift();
     var localId = parts.join(':');
-    var unquoted;
+    var unQuoted;
     var isUrl = false;
-    if (localId.startsWith('"') && localId.endsWith('"')){
-      unquoted = localId.slice(1, -1);
+    if (isQuotedIdentifier(localId)){
+      unQuoted = unQuoteIdentifier(localId);
       try {
-        var url = new URL(unquoted);
+        var url = new URL(unQuoted);
         isUrl = true;
       }
       catch(e){
@@ -507,7 +513,7 @@ class DuckDbDataSource extends EventEmitter {
       type: type,
       localId: localId,
       isUrl: isUrl,
-      resource: unquoted
+      resource: unQuoted
     };
   }
   
@@ -1077,7 +1083,14 @@ class DuckDbDataSource extends EventEmitter {
     var sql = this.getSqlForTableSchema();
     var connection = await this.getConnection();
     await this.registerFile();
-    var columnMetadata = connection.query(sql);
+    var columnMetadata;
+    try {
+      columnMetadata = await connection.query(sql);
+    }
+    catch (e) {
+      showErrorDialog(e);
+      throw e;
+    }
     this.#columnMetadata = columnMetadata;
     return columnMetadata;
   }
