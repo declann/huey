@@ -12,6 +12,9 @@ class PostMessageInterface {
     var request = event.data;    
     var requestType = request.messageType;
     
+    console.log(request.body.datasourceConfig.data)
+    alert(`iframe: Got an array of length ${request.body.datasourceConfig.data.length}`)
+    
     var requestId = request.requestId;
     var response = {
       messageType: PostMessageProtocol.RESPONSE,
